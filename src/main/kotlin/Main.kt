@@ -6,6 +6,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -69,9 +71,32 @@ fun main() = application {
         val notification = remember { mutableStateOf(errorNotification) }
         val hideCompleted = remember { mutableStateOf(false) }
 
+        fun addItemToTodo(): Unit {
+            notification.value = ""
+            if (todoInputText.value.trim().isEmpty()) {
+                notification.value = "NOTIFICATION: You need to enter a valid value"
+            } else if (todoInputText.value in todos.value) {
+                notification.value = "NOTIFICATION: You already have the same task"
+            } else if (todoInputText.value.indexOf(taskDelimiter) != -1) {
+                notification.value = "NOTIFICATION: Character \"$taskDelimiter\" not allowed"
+            } else {
+                // we need to add a delimiter to the task before we add it to the list
+                todos.value += "0$taskDelimiter${todoInputText.value}"
+                // the below variable will be used to rewrite the db file
+                var text = ""
+                // here we generate the new db file text
+                todos.value.map { todo -> text += "$todo\n" }
+
+                try {
+                    writeToDb(db, text)
+                    todoInputText.value = ""
+                } catch (e: Exception) {
+                    notification.value = "NOTIFICATION: Could not save to database"
+                }
+            }
+        }
+
         MaterialTheme {
-
-
             Column(Modifier.fillMaxSize(), Arrangement.spacedBy(5.dp)) {
                 if (notification.value.isNotEmpty()) {
                     Text(
@@ -84,7 +109,17 @@ fun main() = application {
                 Row {
                     TextField(
                         value = todoInputText.value,
-                        modifier = Modifier.padding(10.dp),
+                        modifier = Modifier.padding(10.dp).onPreviewKeyEvent {
+                            when {
+                                // it is ctrl because I don't know how to make it enter without
+                                // using experimental features
+                                (it.isCtrlPressed) -> {
+                                    addItemToTodo()
+                                    true
+                                }
+                                else -> false
+                            }
+                        },
                         label = { Text("Todo text") },
                         onValueChange = { text: String -> todoInputText.value = text },
                     )
@@ -92,37 +127,20 @@ fun main() = application {
                     Button(
                         modifier = Modifier.padding(10.dp),
                         onClick = {
-                            notification.value = ""
-                            if (todoInputText.value.trim().isEmpty()) {
-                                notification.value = "NOTIFICATION: You need to enter a valid value"
-                            } else if (todoInputText.value in todos.value) {
-                                notification.value = "NOTIFICATION: You already have the same task"
-                            } else if (todoInputText.value.indexOf(taskDelimiter) != -1) {
-                                notification.value = "NOTIFICATION: Character \"$taskDelimiter\" not allowed"
-                            } else {
-                                // we need to add a delimiter to the task before we add it to the list
-                                todos.value += "0$taskDelimiter${todoInputText.value}"
-                                // the below variable will be used to rewrite the db file
-                                var text = ""
-                                // here we generate the new db file text
-                                todos.value.map { todo -> text += "$todo\n" }
-
-                                try {
-                                    writeToDb(db, text)
-                                    todoInputText.value = ""
-                                } catch (e: Exception) {
-                                    notification.value = "NOTIFICATION: Could not save to database"
-                                }
-                            }
+                            addItemToTodo()
                         }) {
                         Text("Add")
                     }
 
                     Button(
                         modifier = Modifier.padding(10.dp),
-                        onClick = {},
+                        onClick = {hideCompleted.value = !hideCompleted.value},
                     ) {
-                        Text("Hide Completed")
+                        if(hideCompleted.value) {
+                            Text("Show completed")
+                        } else {
+                            Text("Hide completed")
+                        }
                     }
                 }
 
@@ -148,6 +166,12 @@ fun main() = application {
                                 val todoSplit = todo.split(taskDelimiter)
                                 val isDone = todoSplit[0] == "1"
                                 val todoText = todoSplit[1]
+
+                                // don't show completed tasks if the user has chosen to hide them
+                                if(hideCompleted.value && isDone) {
+                                    continue
+                                }
+
                                 Box(modifier = Modifier.clickable(onClick = {
                                     var text = ""
                                     val completed = if (isDone) "0" else "1"
