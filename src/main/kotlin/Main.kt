@@ -1,14 +1,11 @@
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.*
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Color.Companion.Red
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -75,166 +72,165 @@ fun main() = application {
         MaterialTheme {
 
 
+            Column(Modifier.fillMaxSize(), Arrangement.spacedBy(5.dp)) {
+                if (notification.value.isNotEmpty()) {
+                    Text(
+                        notification.value,
+                        modifier = Modifier.padding(10.dp),
+                        color = Color.Red,
+                    )
+                }
 
-                Column(Modifier.fillMaxSize(), Arrangement.spacedBy(5.dp)) {
-                    if (notification.value.isNotEmpty()) {
-                        Text(
-                            notification.value,
-                            modifier = Modifier.padding(10.dp),
-                            color = Color.Red,
-                        )
+                Row {
+                    TextField(
+                        value = todoInputText.value,
+                        modifier = Modifier.padding(10.dp),
+                        label = { Text("Todo text") },
+                        onValueChange = { text: String -> todoInputText.value = text },
+                    )
+
+                    Button(
+                        modifier = Modifier.padding(10.dp),
+                        onClick = {
+                            notification.value = ""
+                            if (todoInputText.value.trim().isEmpty()) {
+                                notification.value = "NOTIFICATION: You need to enter a valid value"
+                            } else if (todoInputText.value in todos.value) {
+                                notification.value = "NOTIFICATION: You already have the same task"
+                            } else if (todoInputText.value.indexOf(taskDelimiter) != -1) {
+                                notification.value = "NOTIFICATION: Character \"$taskDelimiter\" not allowed"
+                            } else {
+                                // we need to add a delimiter to the task before we add it to the list
+                                todos.value += "0$taskDelimiter${todoInputText.value}"
+                                // the below variable will be used to rewrite the db file
+                                var text = ""
+                                // here we generate the new db file text
+                                todos.value.map { todo -> text += "$todo\n" }
+
+                                try {
+                                    writeToDb(db, text)
+                                    todoInputText.value = ""
+                                } catch (e: Exception) {
+                                    notification.value = "NOTIFICATION: Could not save to database"
+                                }
+                            }
+                        }) {
+                        Text("Add")
                     }
 
-                    Row {
-                        TextField(
-                            value = todoInputText.value,
-                            modifier = Modifier.padding(10.dp),
-                            label = { Text("Todo text") },
-                            onValueChange = { text: String -> todoInputText.value = text },
-                        )
+                    Button(
+                        modifier = Modifier.padding(10.dp),
+                        onClick = {},
+                    ) {
+                        Text("Hide Completed")
+                    }
+                }
 
-                        Button(
-                            modifier = Modifier.padding(10.dp),
-                            onClick = {
-                                notification.value = ""
-                                if (todoInputText.value.trim().isEmpty()) {
-                                    notification.value = "NOTIFICATION: You need to enter a valid value"
-                                } else if (todoInputText.value in todos.value) {
-                                    notification.value = "NOTIFICATION: You already have the same task"
-                                } else if (todoInputText.value.indexOf(taskDelimiter) != -1) {
-                                    notification.value = "NOTIFICATION: Character \"$taskDelimiter\" not allowed"
-                                } else {
-                                    // we need to add a delimiter to the task before we add it to the list
-                                    todos.value += "0$taskDelimiter${todoInputText.value}"
-                                    // the below variable will be used to rewrite the db file
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(10.dp)
+                ) {
+                    val stateVertical = rememberScrollState(0)
+
+                    // lol, this scroll bar was hella difficult to get working
+                    // https://github.com/JetBrains/compose-jb/tree/master/tutorials/Desktop_Components
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(stateVertical)
+                            .padding(end = 12.dp, bottom = 12.dp)
+                    ) {
+                        Column {
+                            for (todo in todos.value) {
+                                if (todo.trim().isEmpty()) {
+                                    continue
+                                }
+
+                                val todoSplit = todo.split(taskDelimiter)
+                                val isDone = todoSplit[0] == "1"
+                                val todoText = todoSplit[1]
+                                Box(modifier = Modifier.clickable(onClick = {
                                     var text = ""
-                                    // here we generate the new db file text
-                                    todos.value.map { todo -> text += "$todo\n" }
+                                    val completed = if (isDone) "0" else "1"
+
+                                    todos.value.map { todo ->
+                                        text += when (todo.split(taskDelimiter)[1]) {
+                                            todoText -> "$completed$taskDelimiter${todoText}\n"
+                                            else -> "$todo\n"
+                                        }
+                                    }
 
                                     try {
                                         writeToDb(db, text)
-                                        todoInputText.value = ""
+                                        // there is 100% a faster and better way to do this, but I'm lazy
+                                        todos.value = readFromDb(db)
                                     } catch (e: Exception) {
-                                        notification.value = "NOTIFICATION: Could not save to database"
+                                        notification.value = "NOTIFICATION: Could not update task"
                                     }
-                                }
-                            }) {
-                            Text("Add")
-                        }
+                                })) {
+                                    Row {
+                                        Spacer(modifier = Modifier.width(16.dp))
 
-                        Button(
-                            modifier = Modifier.padding(10.dp),
-                            onClick = {},
-                        ) {
-                            Text("Hide Completed")
-                        }
-                    }
+                                        Checkbox(
+                                            checked = isDone,
+                                            modifier = Modifier.align(Alignment.CenterVertically),
+                                            onCheckedChange = {
+                                                print("checked")
+                                            },
+                                        )
 
-                    Box(
-                        modifier = Modifier.fillMaxSize().padding(10.dp)
-                    ) {
-                        val stateVertical = rememberScrollState(0)
+                                        Spacer(modifier = Modifier.width(8.dp))
 
-                        // lol, this scroll bar was hella difficult to get working
-                        // https://github.com/JetBrains/compose-jb/tree/master/tutorials/Desktop_Components
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(stateVertical)
-                                .padding(end = 12.dp, bottom = 12.dp)
-                        ) {
-                            Column {
-                                for (todo in todos.value) {
-                                    if (todo.trim().isEmpty()) {
-                                        continue
-                                    }
+                                        Text(
+                                            todoText,
+                                            modifier = Modifier.padding(15.dp)
+                                        )
 
-                                    val todoSplit = todo.split(taskDelimiter)
-                                    val isDone = todoSplit[0] == "1"
-                                    val todoText = todoSplit[1]
-                                    Box(modifier = Modifier.clickable(onClick = {
-                                        var text = ""
-                                        val completed = if (isDone) "0" else "1"
+                                        Spacer(modifier = Modifier.width(50.dp))
 
-                                        todos.value.map { todo ->
-                                            text += when (todo.split(taskDelimiter)[1]) {
-                                                todoText -> "$completed$taskDelimiter${todoText}\n";
-                                                else -> "$todo\n"
-                                            }
+                                        Button(
+                                            onClick = {
+                                                notification.value = ""
+                                                todos.value
+                                                val allowedTodos: MutableList<String> = mutableListOf()
+
+                                                todos.value.map { selectedTodo ->
+                                                    if (selectedTodo != todo) {
+                                                        allowedTodos.add(selectedTodo)
+                                                    }
+                                                }
+
+                                                var text = ""
+                                                for (selectedTodo in allowedTodos) {
+                                                    text += selectedTodo + "\n"
+                                                }
+
+                                                try {
+                                                    writeToDb(db, text)
+                                                    todos.value = allowedTodos
+                                                } catch (e: Exception) {
+                                                    notification.value = "NOTIFICATION: Could not save to database"
+                                                }
+
+                                            }) {
+                                            Text("Delete")
                                         }
 
-                                        try {
-                                            writeToDb(db, text)
-                                            // there is 100% a faster and better way to do this, but I'm lazy
-                                            todos.value = readFromDb(db)
-                                        } catch (e: Exception) {
-                                            notification.value = "NOTIFICATION: Could not update task"
-                                        }
-                                    })) {
-                                        Row() {
-                                            Spacer(modifier = Modifier.width(16.dp))
-
-                                            Checkbox(
-                                                checked = isDone,
-                                                modifier = Modifier.align(Alignment.CenterVertically),
-                                                onCheckedChange = {
-                                                    print("checked")
-                                                },
-                                            )
-
-                                            Spacer(modifier = Modifier.width(8.dp))
-
-                                            Text(
-                                                todoText,
-                                                modifier = Modifier.padding(15.dp)
-                                            )
-
-                                            Spacer(modifier = Modifier.width(50.dp))
-
-                                            Button(
-                                                onClick = {
-                                                    notification.value = ""
-                                                    todos.value
-                                                    val allowedTodos: MutableList<String> = mutableListOf()
-
-                                                    todos.value.map { selectedTodo ->
-                                                        if (selectedTodo != todo) {
-                                                            allowedTodos.add(selectedTodo)
-                                                        }
-                                                    }
-
-                                                    var text = ""
-                                                    for (selectedTodo in allowedTodos) {
-                                                        text += selectedTodo + "\n"
-                                                    }
-
-                                                    try {
-                                                        writeToDb(db, text)
-                                                        todos.value = allowedTodos
-                                                    } catch (e: Exception) {
-                                                        notification.value = "NOTIFICATION: Could not save to database"
-                                                    }
-
-                                                }) {
-                                                Text("Delete")
-                                            }
-
-                                        }
-                                        Divider()
-
                                     }
+                                    Divider()
 
                                 }
+
                             }
                         }
-
-                        VerticalScrollbar(
-                            modifier = Modifier.align(Alignment.CenterEnd)
-                                .fillMaxHeight(),
-                            adapter = rememberScrollbarAdapter(stateVertical)
-                        )
                     }
+
+                    VerticalScrollbar(
+                        modifier = Modifier.align(Alignment.CenterEnd)
+                            .fillMaxHeight(),
+                        adapter = rememberScrollbarAdapter(stateVertical)
+                    )
                 }
             }
+        }
     }
 }
