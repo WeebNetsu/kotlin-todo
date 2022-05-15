@@ -134,9 +134,9 @@ fun main() = application {
 
                     Button(
                         modifier = Modifier.padding(10.dp),
-                        onClick = {hideCompleted.value = !hideCompleted.value},
+                        onClick = { hideCompleted.value = !hideCompleted.value },
                     ) {
-                        if(hideCompleted.value) {
+                        if (hideCompleted.value) {
                             Text("Show completed")
                         } else {
                             Text("Hide completed")
@@ -168,7 +168,7 @@ fun main() = application {
                                 val todoText = todoSplit[1]
 
                                 // don't show completed tasks if the user has chosen to hide them
-                                if(hideCompleted.value && isDone) {
+                                if (hideCompleted.value && isDone) {
                                     continue
                                 }
 
